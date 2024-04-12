@@ -199,45 +199,48 @@
             URL.revokeObjectURL(a.href);
         }
 
-        async function moveToTodo() {
-            const summary = document.getElementById('summarized-notes').innerText;
-            if (summary) {
-                try {
-                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${openaiApiKey}`
-                        },
-                        body: JSON.stringify({
-                            model: "gpt-4-turbo",
-                            messages: [
-                                { role: "system", content: "You are a helpful assistant." },
-                                { role: "user", content: `from these, find three things to do for the student to master the concepts/ for the person to finish the most important things outlined in the notes: ${summary}` }
-                            ]
-                        })
-                    });
+async function moveToTodo() {
+    const summary = document.getElementById('summarized-notes').innerText;
+    if (summary) {
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4-turbo",
+                    messages: [
+                        { role: "system", content: "You are a helpful assistant." },
+                        { role: "user", content: `Please list three actionable items based on the following summary, each item starting with a dash (-): ${summary}` }
+                    ]
+                })
+            });
 
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    const actionItems = data.choices[0].message.content;
-
-                    // Split the action items into individual tasks and add them to the to-do list
-                    const tasks = actionItems.split('\n').filter(task => task.trim() !== '').slice(0, 3);
-                    tasks.forEach(task => {
-                        addTaskToList(task.trim());
-                    });
-
-                    document.getElementById('summarized-notes').innerText = ''; // Clear summarized notes
-                } catch (error) {
-                    console.error('Error extracting action items:', error);
-                    alert('Error extracting action items. Check the console for details.');
-                }
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+
+            const data = await response.json();
+            const actionItems = data.choices[0].message.content;
+
+            // Split the action items into individual tasks and add them to the to-do list
+            const tasks = actionItems.split('\n').filter(task => task.trim().startsWith('-')).map(task => task.trim().substring(1).trim());
+            tasks.forEach(task => {
+                if (task !== '') {
+                    addTaskToList(task);
+                }
+            });
+
+            document.getElementById('summarized-notes').innerText = ''; // Clear summarized notes
+        } catch (error) {
+            console.error('Error extracting action items:', error);
+            alert('Error extracting action items. Check the console for details.');
         }
+    }
+}
+
 
         function addTask() {
             const task = document.getElementById('todo-input').value;
