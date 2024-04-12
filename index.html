@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goal Tracker</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #007BFF;
+            color: white;
+            text-align: center;
+            padding: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        main {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: white;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        section {
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #007BFF;
+            display: inline-block;
+            padding-bottom: 5px;
+        }
+
+        textarea, #todo-input {
+            width: calc(100% - 20px);
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #summarized-notes {
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 0.75rem;
+            min-height: 100px;
+            background-color: #f9f9f9;
+            margin-bottom: 1rem;
+        }
+
+        #todo-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        #todo-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+        }
+
+        #todo-list li:last-child {
+            border-bottom: none;
+        }
+
+        .task-checkbox {
+            margin-right: 1rem;
+        }
+
+        .task-text {
+            flex: 1;
+        }
+
+        .task-delete {
+            color: #007BFF;
+            cursor: pointer;
+        }
+
+        .task-delete:hover {
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Goal Tracker</h1>
+    </header>
+    <main>
+        <section id="notes-section">
+            <h2>Notes</h2>
+            <textarea id="notes-input" placeholder="Enter your notes here..."></textarea>
+            <div>
+                <button id="start-voice-input" onclick="startVoiceInput()">Start Voice Input</button>
+                <button id="summarize-notes" onclick="summarizeNotes()">Summarize Notes</button>
+            </div>
+        </section>
+        <section id="summary-section">
+            <h2>Summarized Notes</h2>
+            <div id="summarized-notes"></div>
+            <button id="move-to-todo" onclick="moveToTodo()">Move to To-Do List</button>
+        </section>
+        <section id="todo-section">
+            <h2>To-Do List</h2>
+            <ul id="todo-list"></ul>
+            <div>
+                <input type="text" id="todo-input" placeholder="Add a new task...">
+                <button id="add-task" onclick="addTask()">Add Task</button>
+            </div>
+        </section>
+    </main>
+    <button id="export-notes" onclick="exportNotes()">Export Notes</button>
+
+    <script>
+        const openaiApiKey = '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';
+
+        async function summarizeNotes() {
+            const notes = document.getElementById('notes-input').value;
+            try {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${openaiApiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: "gpt-4-turbo",
+                        messages: [
+                            { role: "system", content: "You are a helpful assistant." },
+                            { role: "user", content: `Craft a summary that is detailed, thorough, in-depth, and complex, while maintaining clarity and conciseness. ${notes}` }
+                        ]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(`OpenAI error: ${data.error.message}`);
+                }
+
+                const summary = data.choices[0].message.content;
+                document.getElementById('summarized-notes').innerText = summary;
+            } catch (error) {
+                console.error('Error summarizing notes:', error);
+                alert('Error summarizing notes. Check the console for details.');
+            }
+        }
+
+        function startVoiceInput() {
+            const notesInput = document.getElementById('notes-input');
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                notesInput.value += transcript + ' ';
+            };
+
+            recognition.start();
+        }
+
+        function exportNotes() {
+            const notes = document.getElementById('notes-input').value;
+            const blob = new Blob([notes], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'notes.txt';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        async function moveToTodo() {
+            const summary = document.getElementById('summarized-notes').innerText;
+            if (summary) {
+                try {
+                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${openaiApiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "gpt-4-turbo",
+                            messages: [
+                                { role: "system", content: "You are a helpful assistant." },
+                                { role: "user", content: `from these, find three things to do for the student to master the concepts/ for the person to finish the most important things outlined in the notes: ${summary}` }
+                            ]
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const actionItems = data.choices[0].message.content;
+
+                    // Split the action items into individual tasks and add them to the to-do list
+                    const tasks = actionItems.split('\n').filter(task => task.trim() !== '').slice(0, 3);
+                    tasks.forEach(task => {
+                        addTaskToList(task.trim());
+                    });
+
+                    document.getElementById('summarized-notes').innerText = ''; // Clear summarized notes
+                } catch (error) {
+                    console.error('Error extracting action items:', error);
+                    alert('Error extracting action items. Check the console for details.');
+                }
+            }
+        }
+
+        function addTask() {
+            const task = document.getElementById('todo-input').value;
+            addTaskToList(task);
+            document.getElementById('todo-input').value = ''; // Clear input field
+        }
+
+        function addTaskToList(task) {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <input type="checkbox" class="task-checkbox">
+                <span class="task-text">${task}</span>
+                <span class="task-delete" onclick="deleteTask(this)">x</span>
+            `;
+            document.getElementById('todo-list').appendChild(li);
+        }
+
+        function deleteTask(element) {
+            element.parentElement.remove();
+        }
+    </script>
+</body>
+</html>
